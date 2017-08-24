@@ -1,10 +1,41 @@
-import tensorflow as tf
-import numpy as np
 import pygame
+import pygame.camera
+import numpy as np
+import matplotlib.pyplot as plt
+import tensorflow as tf
 from scipy.misc import imread, imresize
 from imagenet_classes import class_names
-from util import webcam
-from time import time
+import plotly
+plotly.tools.set_credentials_file(username='DaeWonKim', api_key='z11PBSGtr5d176lqSPhv')
+import plotly.plotly as py
+import plotly.graph_objs as go
+
+def show_dataset(img):
+    plot = None
+    if plot is None:
+        plot = plt.imshow(img, vmin=0, vmax=255)
+    else:
+        plot.set_data(img)
+    plt.pause(0.0001)
+    plt.draw()
+    # plt.close()
+
+
+def plot_results(results, clear=True):
+    # if clear:
+        # plt.clf()
+    plt.figure(figsize=(10,10))
+    sep = ','
+    objects = [x.split(sep, 1)[0] for x,y in results]
+    y_pos = np.arange(len(objects))
+    performance = [y for x,y in results]
+    plot = plt.bar(y_pos, performance, align='center', alpha=0.5)
+    plt.xticks(y_pos, objects)
+    plt.ylabel('Probability')
+    plt.title('Class')
+    # plt.show()
+    plt.pause(0.0001)
+    plt.draw
 
 class vgg16:
     def __init__(self, imgs, weights=None, sess=None):
@@ -244,27 +275,56 @@ class vgg16:
             print(i, k, np.shape(weights[k]))
             sess.run(self.parameters[i].assign(weights[k]))
 
+class webcam:
 
-if __name__ == '__main__':
+    def __init__(self, session=None, vgg=None):
+
+        self.size = (640, 480)
+        self.events = None
+        self.ready = False
+        display = pygame.display.set_mode(self.size, 0)
+        pygame.camera.init()
+        cam = pygame.camera.Camera(pygame.camera.list_cameras()[0], self.size)
+        cam.start()
+        snapshot = pygame.surface.Surface(self.size, 0, display)
+
+        try:
+            while True:
+                self.events = pygame.event.get()
+                snapshot = cam.get_image(snapshot)
+                display.blit(snapshot, (0, 0))
+                pygame.display.flip()
+                for event in self.events:
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_RETURN:
+                            img = cam.get_image()
+                            raw = img.get_buffer().raw
+                            arr = np.flip(np.frombuffer(raw, dtype=np.ubyte).reshape(self.size[1], self.size[0], 3), 2)
+                            print('Picture taken!')
+
+                            img = imresize(arr, (224, 224))
+                            prob = session.run(vgg.probs, feed_dict={vgg.imgs: [img]})[0]
+                            preds = (np.argsort(prob)[::-1])[0:5]
+                            results = []
+                            for p in preds:
+                                results.append((class_names[p], prob[p]))
+                                print(class_names[p], prob[p])
+                            plot_results(results, clear=True)
+                            # show_dataset(arr)
+
+        except KeyboardInterrupt:
+            pass
+        cam.stop()
+
+    def is_ready(self):
+        return self.ready
+
+def main():
     sess = tf.Session()
     imgs = tf.placeholder(tf.float32, [None, 224, 224, 3])
     vgg = vgg16(imgs, 'vgg16_weights.npz', sess)
 
-<<<<<<< HEAD
-    # cam = webcam()
+    cam = webcam(session=sess, vgg=vgg)
 
-    img1 = imread('blackbuck.png', mode='RGB')
-    img1 = imresize(img1, (224, 224))
-=======
-    cam = webcam()
-    
-
-    # img1 = imread('blackbuck.png', mode='RGB')
-    # img1 = imresize(img1, (224, 224))
-    # print(img1)
->>>>>>> 25eb846bae19eb648147221b1a10ca34a430fb08
-
-    '''prob = sess.run(vgg.probs, feed_dict={vgg.imgs: [img1]})[0]
-    preds = (np.argsort(prob)[::-1])[0:5]
-    for p in preds:
-        print(class_names[p], prob[p])'''
+if __name__ == '__main__':
+    main()
