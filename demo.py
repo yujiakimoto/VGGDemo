@@ -5,10 +5,6 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from scipy.misc import imread, imresize
 from imagenet_classes import class_names
-import plotly
-plotly.tools.set_credentials_file(username='DaeWonKim', api_key='z11PBSGtr5d176lqSPhv')
-import plotly.plotly as py
-import plotly.graph_objs as go
 
 def show_dataset(img):
     plot = None
@@ -22,8 +18,7 @@ def show_dataset(img):
 
 
 def plot_results(results, clear=True):
-    # if clear:
-        # plt.clf()
+    plt.close()
     plt.figure(figsize=(10,10))
     sep = ','
     objects = [x.split(sep, 1)[0] for x,y in results]
@@ -288,36 +283,36 @@ class webcam:
         cam.start()
         snapshot = pygame.surface.Surface(self.size, 0, display)
 
-        try:
-            while True:
-                self.events = pygame.event.get()
-                snapshot = cam.get_image(snapshot)
-                display.blit(snapshot, (0, 0))
-                pygame.display.flip()
-                for event in self.events:
-                    if event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_RETURN:
-                            img = cam.get_image()
-                            raw = img.get_buffer().raw
-                            arr = np.flip(np.frombuffer(raw, dtype=np.ubyte).reshape(self.size[1], self.size[0], 3), 2)
-                            print('Picture taken!')
+        with session.as_default():
+            try:
+                while True:
+                    self.events = pygame.event.get()
+                    snapshot = cam.get_image(snapshot)
+                    display.blit(snapshot, (0, 0))
+                    pygame.display.flip()
+                    for event in self.events:
+                        if event.type == pygame.KEYDOWN:
+                            if event.key == pygame.K_RETURN:
+                                img = cam.get_image()
+                                raw = img.get_buffer().raw
+                                arr = np.flip(np.frombuffer(raw, dtype=np.ubyte).reshape(self.size[1], self.size[0], 3), 2)
+                                print('Picture taken!')
 
-                            img = imresize(arr, (224, 224))
-                            prob = session.run(vgg.probs, feed_dict={vgg.imgs: [img]})[0]
-                            preds = (np.argsort(prob)[::-1])[0:5]
-                            results = []
-                            for p in preds:
-                                results.append((class_names[p], prob[p]))
-                                print(class_names[p], prob[p])
-                            plot_results(results, clear=True)
-                            # show_dataset(arr)
+                                img = imresize(arr, (224, 224))
+                                # prob = session.run(vgg.probs, feed_dict={vgg.imgs: [img]})[0]
+                                prob = vgg.probs.eval({vgg.imgs: [img]})[0]
+                                preds = (np.argsort(prob)[::-1])[0:5]
+                                results = []
+                                for p in preds:
+                                    results.append((class_names[p], prob[p]))
+                                    print(class_names[p], prob[p])
+                                plot_results(results, clear=True)
+                                # show_dataset(arr)
 
-        except KeyboardInterrupt:
-            pass
-        cam.stop()
+            except KeyboardInterrupt:
+                pass
+            cam.stop()
 
-    def is_ready(self):
-        return self.ready
 
 def main():
     sess = tf.Session()
